@@ -16,6 +16,7 @@ def construct_integrator(version, full, nu, L, nx, nt):
     k = (2 * jnp.pi / L) * fftfreq(nx) * nx
     dealias = jnp.zeros_like(k)
     dealias = jnp.abs(k) > jnp.max(k) * 2/3
+    # note: dealiasing apparently does not make any difference
 
     # Fourier Transform of the linear and nonlinear operators
     FL = (k ** 2) - nu * (k ** 4)
@@ -107,8 +108,8 @@ def construct_integrator(version, full, nu, L, nx, nt):
 
             # set initial condition in real and Fourier space
             u      = u     .at[0].set( u0 )
-            u_hat  = u_hat .at[0].set( (1 / nx) * fft(u[0])    )
-            u_hat2 = u_hat2.at[0].set( (1 / nx) * fft(u[0]**2) )
+            u_hat  = u_hat .at[0].set( (1 / nx) * fft(u0)    )
+            u_hat2 = u_hat2.at[0].set( (1 / nx) * fft(u0**2) )
 
             # first timestep (no advanced restarting, just Euler)
             u_hat  = u_hat .at[1].set( CN2 * ( CN1 * u_hat[0] + FN * u_hat2[0] * dt) )
@@ -144,8 +145,8 @@ def construct_integrator(version, full, nu, L, nx, nt):
 
             # set initial condition in real and Fourier space
             u      = jnp.float64(u0)
-            u_hat  = jnp.complex128((1 / nx) * fft(u[0]))
-            u_hat2 = jnp.complex128((1 / nx) * fft(u[0]**2))
+            u_hat  = jnp.complex128((1 / nx) * fft(u0))
+            u_hat2 = jnp.complex128((1 / nx) * fft(u0**2))
 
             # first timestep (no advanced restarting, just Euler)
             u_hatL  = CN2 * ( CN1 * u_hat + FN * u_hat2 * dt)
@@ -196,3 +197,4 @@ def PO_autocorrelation(u,nt,RAM_limited=True,exclusion=0.1):
         a = np.argmin(diff) % nt
         b = np.argmin(diff) // nt
         return min(a,b), max(a,b), bigdiff
+    
