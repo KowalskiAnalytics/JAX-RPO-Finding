@@ -23,7 +23,7 @@ import jax.numpy as jnp
 from jax.interpreters import mlir
 from jax.interpreters import xla
 
-from jax import core
+from jax._src import core
 from jax._src.lib import gpu_solver
 
 import numpy as np
@@ -31,10 +31,10 @@ from scipy.sparse import csr_matrix, linalg
 
 
 def lobpcg_standard(
-    A: Union[jax.DeviceArray, Callable[[jax.DeviceArray], jax.DeviceArray]],
-    X: jax.DeviceArray,
+    A: Union[jax.Array, Callable[[jax.Array], jax.Array]],
+    X: jax.Array,
     m: int = 100,
-    tol: Union[jax.DeviceArray, float, None] = None):
+    tol: Union[jax.Array, float, None] = None):
   """Compute the top-k standard eigenvalues using the LOBPCG routine.
 
   LOBPCG [1] stands for Locally Optimal Block Preconditioned Conjugate Gradient.
@@ -95,16 +95,16 @@ def lobpcg_standard(
                  large (only `k * 5 < n` supported), or `k == 0`.
   """
   # Jit-compile once per matrix shape if possible.
-  if isinstance(A, (jax.DeviceArray, np.ndarray)):
+  if isinstance(A, (jax.Array, np.ndarray)):
     return _lobpcg_standard_matrix(A, X, m, tol, debug=False)
   return _lobpcg_standard_callable(A, X, m, tol, debug=False)
 
 @functools.partial(jax.jit, static_argnames=['m', 'debug'])
 def _lobpcg_standard_matrix(
-    A: jax.DeviceArray,
-    X: jax.DeviceArray,
+    A: jax.Array,
+    X: jax.Array,
     m: int,
-    tol: Union[jax.DeviceArray, float, None],
+    tol: Union[jax.Array, float, None],
     debug: bool = False):
   """Computes lobpcg_standard(), possibly with debug diagnostics."""
   return _lobpcg_standard_callable(
@@ -112,10 +112,10 @@ def _lobpcg_standard_matrix(
 
 @functools.partial(jax.jit, static_argnames=['A', 'm', 'debug'])
 def _lobpcg_standard_callable(
-    A: Callable[[jax.DeviceArray], jax.DeviceArray],
-    X: jax.DeviceArray,
+    A: Callable[[jax.Array], jax.Array],
+    X: jax.Array,
     m: int,
-    tol: Union[jax.DeviceArray, float, None],
+    tol: Union[jax.Array, float, None],
     debug: bool = False):
   """Supports generic lobpcg_standard() callable interface."""
 
@@ -510,21 +510,20 @@ def _extend_basis(X, m):
       [w, w[k:, :].T, other], precision=jax.lax.Precision.HIGHEST)
   return h.at[k:].add(other)
 
-"""MODIFIED FROM SOURCE: {x=} becomes x={x}"""
 
 # Sparse direct solve via QR factorization
 def _spsolve_abstract_eval(data, indices, indptr, b, *, tol, reorder):
   if data.dtype != b.dtype:
-    raise ValueError(f"data types do not match: data.dtype={data.dtype} b.dtype={b.dtype}")
+    raise ValueError(f"data types do not match: {data.dtype=} {b.dtype=}")
   if not (jnp.issubdtype(indices.dtype, jnp.integer) and jnp.issubdtype(indptr.dtype, jnp.integer)):
-    raise ValueError(f"index arrays must be integer typed; got indices.dtype={indices.dtype} indptr.dtype={indptr.dtype}")
+    raise ValueError(f"index arrays must be integer typed; got {indices.dtype=} {indptr.dtype=}")
   if not data.ndim == indices.ndim == indptr.ndim == b.ndim == 1:
-    raise ValueError("DeviceArrays must be one-dimensional. "
-                     f"Got data.shape={data.shape} indices.shape={indices.shape} indptr.shape={indptr.shape} b.shape={b.shape}")
+    raise ValueError("Arrays must be one-dimensional. "
+                     f"Got {data.shape=} {indices.shape=} {indptr.shape=} {b.shape=}")
   if indptr.size != b.size + 1 or  data.shape != indices.shape:
-    raise ValueError(f"Invalid CSR buffer sizes: data.shape={data.shape} indices.shape={indices.shape} indptr.shape={indptr.shape}")
+    raise ValueError(f"Invalid CSR buffer sizes: {data.shape=} {indices.shape=} {indptr.shape=}")
   if reorder not in [0, 1, 2, 3]:
-    raise ValueError(f"reorder={reorder} not valid, must be one of [1, 2, 3, 4]")
+    raise ValueError(f"{reorder=} not valid, must be one of [1, 2, 3, 4]")
   tol = float(tol)
   return b
 
